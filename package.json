@@ -1,0 +1,28 @@
+{
+  "name": "send-to-figma-local",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Local browser image collector for Figma Desktop",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "build": "node scripts/build.cjs",
+    "check": "node scripts/check.cjs",
+    "package": "node scripts/package.cjs",
+    "browser-check": "node scripts/browser-check.cjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "fflate": "0.8.2",
+    "jsdom": "30.1.2",
+    "playwright-core": "1.64.1",
+    "ws": "8.18.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NasaatR/Send_to_Figma.git"
+  }
+}

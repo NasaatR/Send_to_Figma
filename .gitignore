@@ -1,0 +1,12 @@
+node_modules/
+.build/
+release/
+*.syso
+scripts/go-env.sh
+*.zip
+*.exe
+*.log
+data/
+config.json
+
+dist/

@@ -1,0 +1,72 @@
+name: Check, build and release
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache-dependency-path: bridge/go.sum
+      - run: npm ci --ignore-scripts
+      - run: go -C bridge test -mod=vendor ./...
+      - run: go -C bridge vet -mod=vendor ./...
+      - run: go -C installer test ./...
+      - run: go -C installer vet ./...
+      - run: npm run build
+      - run: npm test
+      - run: npm run check
+      - if: runner.os == 'Linux'
+        run: npm run browser-check
+      - if: runner.os == 'Windows'
+        run: node scripts/windows-smoke.cjs
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: send-to-figma-${{ runner.os }}
+          path: dist/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: ui-preview
+          path: .build/ui/
+          retention-days: 7
+  release:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'NasaatR/Send_to_Figma'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: send-to-figma-Windows
+          path: dist/
+      - name: Publish checked preview build once per version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "Release v$version already exists; issued assets are preserved."
+            exit 0
+          fi
+          gh release create "v$version" dist/*.zip dist/*.sha256 --target "$GITHUB_SHA" --title "Send to Figma $version" --notes-file CHANGELOG.md --prerelease --latest=false
