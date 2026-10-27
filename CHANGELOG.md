@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+- Fix Figma manifest import: declare `ws://localhost:47821` instead of the rejected IP literal. The receiver now uses the same hostname; helper binding and authentication remain unchanged.
+- Add a built-manifest/receiver URL regression check and exercise real WebSocket delivery through localhost in native integration tests.
+- Document updating after a failed manifest import; existing queue and pairing data are preserved.
+
 ## 1.2.1
 
 - Fix intrinsic grid sizing that clipped long queue titles and right-hand controls inside the popup scroll area.

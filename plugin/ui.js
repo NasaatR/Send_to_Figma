@@ -143,7 +143,7 @@
       socket = null;
     }
     state("Подключение…");
-    const ws = new WebSocket("ws://127.0.0.1:47821/receiver");
+    const ws = new WebSocket("ws://localhost:47821/receiver");
     socket = ws;
     ws.onopen = () => {
       if (socket !== ws || !enabled) return;

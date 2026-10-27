@@ -17,3 +17,7 @@ Reviewed primary product pages: https://en.eagle.cool/extensions, https://moodly
 Applied: compact destination-first popup, local thumbnail rows, search/status filters, source links, bounded history, safe batch actions, persistent pause and draft layout presets. Account systems, remote relays, annotations and full-page import remain outside this image-collector's scope. Thumbnails are optional enhancements: a preview failure never turns a valid original capture into a failed import. The original selected image is unchanged when supported.
 
 Build/distribution reference: https://cli.github.com/manual/gh_release_create. Workflow release creation targets the exact commit and uses versioned assets after checks, with no release overwrite.
+
+## Figma manifest import fix — 2026-10-27
+
+The user reproduced a Desktop manifest rejection for `ws://127.0.0.1:47821`. The official manifest documentation permits WebSocket schemes and documents localhost with explicit ports: https://developers.figma.com/docs/plugins/manifest/. Another tool author documents the same IP-literal rejection: https://github.com/mxsyx/codex-figma. Version 1.2.2 uses `ws://localhost:47821` consistently in the manifest and receiver UI. The helper still binds IPv4 loopback and validates Host, Origin and the pairing token. No wildcard or remote network permission was added. Built-manifest and real localhost transport checks cannot replace a Desktop import test.

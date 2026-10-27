@@ -94,7 +94,7 @@ fs.writeFileSync(
       documentAccess: "dynamic-page",
       relaunchButtons: [{ command: "open", name: "Открыть приёмник" }],
       networkAccess: {
-        allowedDomains: ["ws://127.0.0.1:47821"],
+        allowedDomains: ["ws://localhost:47821"],
         reasoning:
           "Receives user-selected images from the local Send to Figma helper on this computer.",
       },

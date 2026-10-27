@@ -1,3 +1,7 @@
+# 1.2.2 manifest import repair
+
+User screenshot reproduced Figma rejecting the allowedDomains IP literal. Changed manifest and receiver URL together to localhost, without broadening network scope or changing helper/data identity. Added a built-output regression guard and changed real native/WebSocket integration tests to resolve localhost. Local build, 45 JavaScript tests (zero skipped), bridge/installer Go tests and vet, packaged resources/hashes passed. Real native tests now connect through localhost. CI and the resulting release must be verified before delivery. Figma Desktop import remains a target-host check.
+
 # 1.2.1 visual follow-up
 
 Real GitHub Chromium screenshots from run 40422933988 exposed horizontal overflow inside the popup main area that the document-wide check did not catch. Fixed the intrinsic grid sizing, preserved ellipsis/actions within the panel, made receiver layout actions sticky and made theme changes immediate. Added the missing scroll-container width assertion. Run 40422933988 passed on both Linux and Windows and published 1.2.0. The Windows job actually exercised Setup.exe install/update/uninstall, per-user Chrome/Edge registration and native stdio; the Linux job exercised actual Chromium rendering/decoding with explicit app API fixtures. The source remains in main; the prior version is preserved rather than overwriting issued bytes. Current checks and release assets must be verified against the resulting commit.

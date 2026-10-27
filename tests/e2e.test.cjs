@@ -75,7 +75,7 @@ function nativeProcess(dir, port) {
   };
 }
 function receiver(port, token) {
-  const socket = new WebSocket("ws://127.0.0.1:" + port + "/receiver", {
+  const socket = new WebSocket("ws://localhost:" + port + "/receiver", {
     origin: "null",
   });
   const messages = [];

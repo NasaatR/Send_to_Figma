@@ -41,3 +41,7 @@ Go: preview validation/retention/cleanup, additive 1.1 queue migration, persiste
 `npm run browser-check` requires an installed Chrome/Chromium (or STF_CHROME_EXECUTABLE). It renders the shipped popup and receiver HTML, tests search/pause/modal Escape/layout presets/no horizontal overflow, and uses actual Chrome PNG/crop decoding. Browser-extension and Figma APIs are explicit fixtures. Its screenshots under .build/ui are internal QA, not marketing assets or actual Figma execution.
 
 `node scripts/windows-smoke.cjs` is restricted to disposable GitHub Actions Windows runners. It exercises actual Setup.exe installation/update/uninstallation, checks Chrome/Edge native registry paths and communicates over a real Windows native stdio process. It does not launch an installed Chrome extension or Figma Desktop.
+
+## 1.2.2 manifest regression
+
+The built receiver manifest must declare the exact localhost WebSocket origin used by the emitted UI, with no IP literal or wildcard. Native integration delivery uses localhost resolution against the real IPv4-loopback helper. These checks guard the reported configuration error but do not execute Figma Desktop’s manifest validator. Retry manifest import and the test image on the target machine after updating.
