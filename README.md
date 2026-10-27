@@ -4,11 +4,11 @@
 
 Send a website image to an ordered collection in Figma Desktop from the browser's right-click menu. Windows 10/11 x64 or ARM64, Chrome/Edge, and an editable Figma Design file are required. No Node.js, Python, Figma API token or cloud relay is required to use the ready-made package.
 
-[Download the checked Windows preview](https://github.com/NasaatR/Send_to_Figma/releases/tag/v1.3.0) · [Source repository](https://github.com/NasaatR/Send_to_Figma)
+[Download the checked Windows preview](https://github.com/NasaatR/Send_to_Figma/releases/tag/v1.3.1) · [Source repository](https://github.com/NasaatR/Send_to_Figma)
 
 ## Install the ready-made package
 
-1. Extract the complete **Send-to-Figma-1.3.0-Windows.zip**, then double-click **Setup.exe**. It installs for your Windows account and opens the instructions. Administrator rights are not requested.
+1. Extract the complete **Send-to-Figma-1.3.1-Windows.zip**, then double-click **Setup.exe**. It installs for your Windows account and opens the instructions. Administrator rights are not requested.
 2. Visit `chrome://extensions` or `edge://extensions`, enable **Developer mode**, choose **Load unpacked**, and select `%LOCALAPPDATA%\SendToFigma\app\extension`.
 3. The connection page opens automatically. In **Figma Desktop**, open your destination file and choose **Plugins → Development → Import plugin from manifest…**. Use the path copied from the connection page: `%LOCALAPPDATA%\SendToFigma\app\figma-plugin\manifest.json`.
 4. Run **Send to Figma · Receiver**. Setup has already paired this installed receiver; it starts receiving automatically. No code or Start click is needed. Click **Отправить тестовое изображение** on the connection page. Success means Figma acknowledged the actual insertion; the test card can then be deleted.
@@ -30,6 +30,8 @@ If Figma reports `Invalid value for allowedDomains`, update to 1.2.2 or later us
 ## Automatic connection
 
 Setup pairs the receiver locally; reopening it restores its collection and reconnects without copying codes. The browser starts the helper when needed. If the helper starts later, the receiver retries automatically (at most 8 seconds between attempts). Captures sent before the first receiver opens are accepted automatically. If the previous default receiver is offline, new captures use the newly opened receiver; already assigned jobs keep their destination. An online default is never silently replaced by another receiver. The manual code controls are under a collapsed fallback section. Import the manifest from the installed app path, not the extracted release folder.
+
+If an older Setup reports `Access is denied` while renaming app, use 1.3.1 or later. It falls back to backed-up file replacement while keeping host-held directories in place. If an individual file is locked, close Chrome/Edge and Figma completely and retry. Do not delete data or elevate Setup.
 
 ## Updates and removal
 
@@ -65,4 +67,4 @@ npm run check
 npm run package
 ```
 
-Build output: `release/Send-to-Figma-1.3.0`. `package.json` is the version source. The 32-bit setup runs on Windows x64 and through Windows ARM's x86 emulation; it installs the native x64 or ARM64 helper. GitHub checks run on Windows and Linux. The Windows job exercises per-user installation, update, removal, registry values and real native stdio. The Linux job renders the actual UI and decodes images in Chromium with explicitly mocked extension/Figma APIs. After both jobs pass, a versioned preview release is published once; existing issued assets are never overwritten. See the actual [Actions results](https://github.com/NasaatR/Send_to_Figma/actions), [TESTING.md](TESTING.md) and [design research](docs/research.md).
+Build output: `release/Send-to-Figma-1.3.1`. `package.json` is the version source. The 32-bit setup runs on Windows x64 and through Windows ARM's x86 emulation; it installs the native x64 or ARM64 helper. GitHub checks run on Windows and Linux. The Windows job exercises per-user installation, update, removal, registry values and real native stdio. The Linux job renders the actual UI and decodes images in Chromium with explicitly mocked extension/Figma APIs. After both jobs pass, a versioned preview release is published once; existing issued assets are never overwritten. See the actual [Actions results](https://github.com/NasaatR/Send_to_Figma/actions), [TESTING.md](TESTING.md) and [design research](docs/research.md).

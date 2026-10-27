@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- Fix Windows updates when a browser, Figma or another process holds the installed app directory open. If the directory swap is denied, update individual files at stable paths after backing up all affected originals.
+- Roll back modified files and registration on failure; retain the backup if restoration is itself blocked. Queue, pairing and unrelated app files are preserved. Locked-file failures now explain how to retry without deleting data or requesting elevation.
+- Reproduce real Windows directory/file locks in installer tests and update the actual Setup.exe with a process holding the app directory as its working directory.
+
 ## 1.3.0
 
 - Replace the browser parent-window identity assumption with a per-launch channel in Figma UI/main messages; show startup/host timeouts instead of leaving an inert Start button.

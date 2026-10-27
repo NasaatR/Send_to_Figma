@@ -1,4 +1,4 @@
-SEND TO FIGMA 1.3.0
+SEND TO FIGMA 1.3.1
 
 Распакуй весь архив → Setup.exe → подключи расширение и импортируй
 %LOCALAPPDATA%\SendToFigma\app\figma-plugin\manifest.json в Figma Desktop.

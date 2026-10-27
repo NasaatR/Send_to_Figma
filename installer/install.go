@@ -139,7 +139,9 @@ func installPackage(source, base, arch string, hooks Hooks) error {
 	hadPrevious := false
 	if _, e := os.Stat(installed); e == nil {
 		if err = os.Rename(installed, backup); err != nil {
-			return err
+			// Browser/Figma directory handles can prohibit renaming app while
+			// allowing individual files to be replaced at their stable paths.
+			return updateInPlace(stage, installed, base, hooks)
 		}
 		hadPrevious = true
 	}
@@ -192,6 +194,9 @@ func copyFile(src, dst string) error {
 		return e
 	}
 	_, e = io.Copy(out, in)
+	if e == nil {
+		e = out.Sync()
+	}
 	ce := out.Close()
 	if e != nil {
 		return e

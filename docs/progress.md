@@ -1,3 +1,7 @@
+# 1.3.1 Windows update repair
+
+The user screenshot shows app -> .previous-app denied by Windows. This is consistent with a directory handle held by a browser/Figma, not proof of which process owns it. Add a file-level fallback with full preflight backups, rollback of only changed files, stable directories, retained recovery files when rollback is blocked, and actionable locked-file errors. Queue/config are outside the modified tree. Local installer tests pass; actual pinned-directory Windows tests and Setup smoke must pass in the release CI before delivery.
+
 # 1.3 connection repair
 
 Goal: fix inert receiver, provision local pairing during Setup, auto-start on plugin launch, one-click redacted diagnostics in Figma/popup/setup. Preserve explicit collection ownership, frozen queued destinations, authentication and local-only transport. Do not add an unauthenticated pairing endpoint.

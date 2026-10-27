@@ -15,7 +15,7 @@ const version = require("../package.json").version,
   env = { ...process.env, LOCALAPPDATA: temp },
   setup = path.join(release, "Setup.exe"),
   installed = path.join(temp, "SendToFigma");
-let native, serverPID;
+let native, serverPID, directoryHolder, holderExit;
 const run = (args) => {
   const r = cp.spawnSync(setup, args, {
     env,
@@ -116,12 +116,31 @@ const run = (args) => {
       path.join(installed, "data", "config.json"),
       "utf8",
     );
+    const app = path.join(installed, "app");
+    // A process whose working directory is app keeps a real Windows directory
+    // handle open. This reproduces the user's denied app -> .previous-app move.
+    fs.writeFileSync(path.join(app, "extension", "setup.html"), "previous version fixture");
+    directoryHolder = cp.spawn(process.execPath, ["-e", "process.stdout.write('ready');process.stdin.on('end',()=>process.exit(0));process.stdin.resume()"], {cwd:app,stdio:["pipe","pipe","pipe"],windowsHide:true});
+    holderExit = new Promise(resolve => directoryHolder.once("exit", resolve));
+    await new Promise((resolve,reject) => {
+      const timer=setTimeout(()=>reject(Error("Directory lock fixture timed out")),10000);
+      directoryHolder.once("error",e=>{clearTimeout(timer);reject(e)});
+      directoryHolder.stdout.once("data",()=>{clearTimeout(timer);resolve()});
+    });
+    const probe = path.join(installed, "rename-probe");
+    let blocked = false;
+    try { fs.renameSync(app, probe); } catch { blocked = true; }
+    if (!blocked) { fs.renameSync(probe,app); throw Error("Working-directory lock did not block the reported rename"); }
     run(["--silent"]);
+    assert.equal(fs.readFileSync(path.join(app,"extension","setup.html"),"utf8"),fs.readFileSync(path.join(release,"extension","setup.html"),"utf8"),"Pinned-directory update did not replace the old file");
     assert.equal(
       fs.readFileSync(path.join(installed, "data", "config.json"), "utf8"),
       config,
       "update changed pairing data",
     );
+    directoryHolder.stdin.end();
+    await holderExit;
+    directoryHolder = null;
     run(["--uninstall", "--silent"]);
     assert.ok(!fs.existsSync(path.join(installed, "app")));
     assert.equal(
@@ -131,10 +150,11 @@ const run = (args) => {
     );
     serverPID = null;
     console.log(
-      "Windows install/update/uninstall, Chrome/Edge registry and native stdio smoke passed. Browser extension and Figma runtime were not exercised.",
+      "Windows install/update with a pinned app directory/uninstall, Chrome/Edge registry and native stdio smoke passed. Browser extension and Figma runtime were not exercised.",
     );
   } finally {
     native?.kill();
+    if (directoryHolder) { directoryHolder.kill(); await holderExit; }
     if (serverPID)
       try {
         process.kill(serverPID);
