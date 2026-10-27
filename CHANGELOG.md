@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1
+
+- Fix intrinsic grid sizing that clipped long queue titles and right-hand controls inside the popup scroll area.
+- Keep layout save/revert/reset controls visible in the Figma layout panel while scrolling.
+- Avoid theme-change button background crossfades and capture stable light/dark QA screenshots.
+- Browser checks now assert the popup scroll container itself has no hidden horizontal overflow.
+
 ## 1.2.0
 
 - Compact image-first popup: consistent SVG controls, local thumbnails, search and active/error/history filters. Destination stays visible; unchanged polls preserve row identity and keyboard focus.

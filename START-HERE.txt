@@ -1,4 +1,4 @@
-SEND TO FIGMA 1.2.0
+SEND TO FIGMA 1.2.1
 
 1. Extract the entire ZIP. Double-click Setup.exe.
 2. Follow the page that opens. It includes the exact folders to select.

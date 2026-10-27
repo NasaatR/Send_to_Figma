@@ -232,12 +232,13 @@ const server = http.createServer((req, res) => {
     await page.goto(url + "/popup.html");
     await page.locator(".job").first().waitFor();
     await page.locator(".job-thumb img").first().waitFor();
-    await page.screenshot({ path: path.join(output, "popup-dark.png") });
+    await page.screenshot({animations:"disabled", path: path.join(output, "popup-dark.png") });
     assert.equal(await page.locator(".job").count(), 4);
     const rowWidth = await page.evaluate(
       () => document.documentElement.scrollWidth,
     );
     assert.ok(rowWidth <= 384, "Horizontal overflow");
+    assert.ok(await page.evaluate(()=>document.querySelector("main").scrollWidth<=document.querySelector("main").clientWidth),"Popup main has hidden horizontal overflow");
     await page.locator("#search").fill("северный");
     assert.equal(await page.locator(".job").count(), 1);
     await page.locator("#search").press("Escape");
@@ -249,12 +250,12 @@ const server = http.createServer((req, res) => {
     await page.locator("[data-filter=active]").click();
     await page.locator("#cancel-waiting").click();
     await page.locator("#confirm-dialog").waitFor();
-    await page.screenshot({ path: path.join(output, "confirm-dark.png") });
+    await page.screenshot({animations:"disabled", path: path.join(output, "confirm-dark.png") });
     await page.locator("#confirm-dialog").press("Escape");
     assert.equal(await page.locator("#confirm-dialog").isVisible(), false);
     await page.locator("#settings-tab").click();
     await page.locator("#theme").selectOption("light");
-    await page.screenshot({ path: path.join(output, "settings-light.png") });
+    await page.screenshot({animations:"disabled", path: path.join(output, "settings-light.png") });
     assert.equal(await page.locator("#theme").inputValue(), "light");
     assert.deepEqual(errors, []);
     await page.close();
@@ -298,7 +299,7 @@ const server = http.createServer((req, res) => {
     await receiver.locator("#layout-tab").click();
     await receiver.locator("#layout-preset").selectOption("compact");
     assert.equal(await receiver.locator("#columns").inputValue(), "6");
-    await receiver.screenshot({
+    await receiver.screenshot({animations:"disabled",
       path: path.join(output, "receiver-layout.png"),
     });
     assert.ok(

@@ -4,11 +4,11 @@
 
 Send a website image to an ordered collection in Figma Desktop from the browser's right-click menu. Windows 10/11 x64 or ARM64, Chrome/Edge, and an editable Figma Design file are required. No Node.js, Python, Figma API token or cloud relay is required to use the ready-made package.
 
-[Download the checked Windows preview](https://github.com/NasaatR/Send_to_Figma/releases/tag/v1.2.0) · [Source repository](https://github.com/NasaatR/Send_to_Figma)
+[Download the checked Windows preview](https://github.com/NasaatR/Send_to_Figma/releases/tag/v1.2.1) · [Source repository](https://github.com/NasaatR/Send_to_Figma)
 
 ## Install the ready-made package
 
-1. Extract the complete **Send-to-Figma-1.2.0-Windows.zip**, then double-click **Setup.exe**. It installs for your Windows account and opens the instructions. Administrator rights are not requested.
+1. Extract the complete **Send-to-Figma-1.2.1-Windows.zip**, then double-click **Setup.exe**. It installs for your Windows account and opens the instructions. Administrator rights are not requested.
 2. Visit `chrome://extensions` or `edge://extensions`, enable **Developer mode**, choose **Load unpacked**, and select `%LOCALAPPDATA%\SendToFigma\app\extension`.
 3. The connection page opens automatically. In **Figma Desktop**, open your destination file and choose **Plugins → Development → Import plugin from manifest…**. Use the path copied from the connection page: `%LOCALAPPDATA%\SendToFigma\app\figma-plugin\manifest.json`.
 4. Run **Send to Figma · Receiver**, paste the pairing code from the extension and click **Начать приём**. Click **Отправить тестовое изображение** on the connection page. Success means Figma acknowledged the actual insertion; the test card can then be deleted.
@@ -59,4 +59,4 @@ npm run check
 npm run package
 ```
 
-Build output: `release/Send-to-Figma-1.2.0`. `package.json` is the version source. The 32-bit setup runs on Windows x64 and through Windows ARM's x86 emulation; it installs the native x64 or ARM64 helper. GitHub checks run on Windows and Linux. The Windows job exercises per-user installation, update, removal, registry values and real native stdio. The Linux job renders the actual UI and decodes images in Chromium with explicitly mocked extension/Figma APIs. After both jobs pass, a versioned preview release is published once; existing issued assets are never overwritten. See the actual [Actions results](https://github.com/NasaatR/Send_to_Figma/actions), [TESTING.md](TESTING.md) and [design research](docs/research.md).
+Build output: `release/Send-to-Figma-1.2.1`. `package.json` is the version source. The 32-bit setup runs on Windows x64 and through Windows ARM's x86 emulation; it installs the native x64 or ARM64 helper. GitHub checks run on Windows and Linux. The Windows job exercises per-user installation, update, removal, registry values and real native stdio. The Linux job renders the actual UI and decodes images in Chromium with explicitly mocked extension/Figma APIs. After both jobs pass, a versioned preview release is published once; existing issued assets are never overwritten. See the actual [Actions results](https://github.com/NasaatR/Send_to_Figma/actions), [TESTING.md](TESTING.md) and [design research](docs/research.md).

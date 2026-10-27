@@ -6,11 +6,11 @@
 
 Нужны Windows 10/11 x64 или ARM64, Chrome/Edge и приложение Figma Desktop с правом редактирования файла. Node.js, Python и ключ Figma API не нужны.
 
-[Скачать проверенную сборку Windows](https://github.com/NasaatR/Send_to_Figma/releases/tag/v1.2.0) · [Репозиторий](https://github.com/NasaatR/Send_to_Figma)
+[Скачать проверенную сборку Windows](https://github.com/NasaatR/Send_to_Figma/releases/tag/v1.2.1) · [Репозиторий](https://github.com/NasaatR/Send_to_Figma)
 
 ## Установка один раз
 
-1. Распакуй **весь** архив `Send-to-Figma-1.2.0-Windows.zip`.
+1. Распакуй **весь** архив `Send-to-Figma-1.2.1-Windows.zip`.
 2. Дважды нажми **Setup.exe**. Откроется инструкция с готовыми путями. Помощник, расширение и плагин копируются в постоянную папку; права администратора не запрашиваются.
 3. В адресную строку Chrome вставь `chrome://extensions` (для Edge — `edge://extensions`). Включи **Режим разработчика → Загрузить распакованное**. Выбери папку:
    `%LOCALAPPDATA%\SendToFigma\app\extension`
