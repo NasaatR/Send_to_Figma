@@ -241,7 +241,17 @@ test(
       server.kill();
       await ended;
       server = null;
-      const after = await native.call("status");
+      // Killing the server can leave one pooled HTTP connection reporting EOF.
+      // Read-only status can be retried by the caller; mutations must never be
+      // replayed automatically after an unknown result. Keep the same native
+      // process so this still proves recovery without a browser restart.
+      const after = await waitFor(async () => {
+        try { return await native.call("status"); }
+        catch (e) {
+          if (!/\/rpc.*EOF/.test(e.message)) throw e;
+          return false;
+        }
+      });
       assert.equal(after.pairingToken, before.pairingToken);
       assert.equal(after.jobs[0].id, "restart-request");
       recoveredPID = Number(

@@ -1,6 +1,6 @@
 # 1.3.1 Windows update repair
 
-The user screenshot shows app -> .previous-app denied by Windows. This is consistent with a directory handle held by a browser/Figma, not proof of which process owns it. Add a file-level fallback with full preflight backups, rollback of only changed files, stable directories, retained recovery files when rollback is blocked, and actionable locked-file errors. Queue/config are outside the modified tree. Local installer tests pass; actual pinned-directory Windows tests and Setup smoke must pass in the release CI before delivery.
+The user screenshot shows app -> .previous-app denied by Windows. This is consistent with a directory handle held by a browser/Figma, not proof of which process owns it. Add a file-level fallback with full preflight backups, rollback of only changed files, stable directories, retained recovery files when rollback is blocked, and actionable locked-file errors. Queue/config are outside the modified tree. Local installer tests pass. Windows run 40438501881 passed the real directory/file-handle tests and actual Setup.exe update with a process holding app as its working directory, followed by removal and native/registration checks. That run exposed an older Linux crash-recovery test race: a pooled HTTP connection may report EOF once after the helper is killed. The test now retries only the read-only status query on that specific EOF, on the same native connection; production mutation retry policy is unchanged. Final release checks must pass on both platforms before delivery.
 
 # 1.3 connection repair
 
