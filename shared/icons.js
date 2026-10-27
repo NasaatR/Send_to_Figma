@@ -1,6 +1,7 @@
 var STFIcons = (function () {
   "use strict";
   const paths = {
+    copy: "M9 8V3h12v14h-5 M3 8h13v13H3Z",
     image:
       "M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M3 16l5-5 5 5 3-3 5 5 M8 7h.01",
     refresh: "M20 7v5h-5 M4 17v-5h5 M6 6a8 8 0 0 1 13 2 M18 18a8 8 0 0 1-13-2",

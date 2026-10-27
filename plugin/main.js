@@ -16,7 +16,9 @@
   };
   let frame = null,
     serial = Promise.resolve();
-  const post = (m) => figma.ui.postMessage(m);
+  const channel = uid() + uid();
+  const installationToken = "__STF_INSTALL_TOKEN__";
+  const post = (m) => figma.ui.postMessage({ ...m, channel });
   function uid() {
     return (
       "collection-" +
@@ -284,7 +286,7 @@
     post({ type: "reflowed", count: cards.length });
   }
   async function handle(m) {
-    if (!m || typeof m.type !== "string") return;
+    if (!m || m.channel !== channel || typeof m.type !== "string") return;
     if (m.type === "import") {
       try {
         const nodeId = await insert(m.job);
@@ -344,7 +346,7 @@
       post({ type: "error", error: e.message || "Действие не выполнено" });
     }
   }
-  figma.showUI(__html__, { width: 340, height: 520, themeColors: true });
+  figma.showUI(__html__.split("__STF_CHANNEL__").join(channel), { width: 340, height: 520, themeColors: true });
   figma.ui.onmessage = (m) => {
     serial = serial
       .then(() => handle(m))
@@ -360,6 +362,7 @@
     });
   });
   serial = (async () => {
+    if (/^[a-f0-9]{64}$/.test(installationToken)) settings.pairingToken = installationToken;
     try {
       const saved = await figma.clientStorage.getAsync("stf-settings-v1");
       if (saved && saved.version === 1) {
@@ -372,6 +375,7 @@
             : "",
         };
       }
+      if (/^[a-f0-9]{64}$/.test(installationToken)) settings.pairingToken = installationToken;
       await restore();
       post({ type: "init", settings, target: targetInfo() });
     } catch (e) {

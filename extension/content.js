@@ -3,7 +3,28 @@
   if (globalThis.__stfContentInstalled) return;
   globalThis.__stfContentInstalled = true;
   let last = null,
-    selectionCleanup = null;
+    selectionCleanup = null,
+    feedbackHost = null,
+    feedbackTimer = null;
+  function feedback(message, kind) {
+    clearTimeout(feedbackTimer);
+    if (feedbackHost) feedbackHost.remove();
+    if (!message) return;
+    const host = document.createElement("div");
+    host.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:2147483647;max-width:min(380px,calc(100vw - 40px));pointer-events:none";
+    host.setAttribute("data-stf-feedback", "");
+    const shadow = host.attachShadow({mode:"closed"});
+    const box = document.createElement("div");
+    box.setAttribute("role", "status");
+    box.style.cssText = "font:13px/1.45 Segoe UI,Arial,sans-serif;padding:12px 16px;border-radius:10px;border:1px solid #ffffff30;background:#242427;color:#fff;box-shadow:0 8px 28px #0003;overflow-wrap:anywhere";
+    if (kind === "error") box.style.borderColor = "#e87f76";
+    if (kind === "done") box.style.borderColor = "#72bd94";
+    box.textContent = "Send to Figma · " + String(message).slice(0,350);
+    shadow.append(box);
+    document.documentElement.append(host);
+    feedbackHost = host;
+    feedbackTimer = setTimeout(() => { host.remove(); if (feedbackHost === host) feedbackHost = null; }, kind === "error" ? 9000 : 5000);
+  }
   function context(event) {
     const path = event.composedPath();
     let el =
@@ -178,6 +199,10 @@
   chrome.runtime.onMessage.addListener((m, sender, reply) => {
     if (sender.id !== chrome.runtime.id) return;
     switch (m?.type) {
+      case "capture-feedback":
+        feedback(m.message, m.kind);
+        reply({ok:true});
+        return;
       case "get-context":
         reply({ ok: true, target: last });
         return;

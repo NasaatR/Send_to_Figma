@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0
+
+- Replace the browser parent-window identity assumption with a per-launch channel in Figma UI/main messages; show startup/host timeouts instead of leaving an inert Start button.
+- Setup provisions the installed receiver with its local pairing token. Existing queue/config are preserved; public packages keep the placeholder and contain no machine credentials.
+- Auto-start and restore the collection on plugin launch, recover helper connections with a capped 8-second delay, and keep manual pairing as a collapsed fallback.
+- Automatically accept first-use captures without a destination. If a default receiver is offline, new captures use the newly opened receiver; already assigned jobs and online destinations remain protected.
+- Add one-click redacted diagnostics in Figma, popup and setup, a bounded persistent browser event log and a selectable clipboard fallback.
+- Show preparation/waiting/confirmed insertion/errors on the website and clearer toolbar badges, independent of desktop notification settings.
+- Exercise emitted UI/main together through a null-source host relay and real native transport, including reopen, queue drain, credential provisioning and privacy regressions.
+
 ## 1.2.2
 
 - Fix Figma manifest import: declare `ws://localhost:47821` instead of the rejected IP literal. The receiver now uses the same hostname; helper binding and authentication remain unchanged.

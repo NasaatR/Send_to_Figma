@@ -1,5 +1,5 @@
 "use strict";
-importScripts("native-client.js", "capture-core.js");
+importScripts("native-client.js", "capture-core.js", "diagnostics.js");
 const native = STFNative.create(chrome),
   MENU = "send-image-to-figma",
   LIMIT = 20 * 1024 * 1024;
@@ -7,6 +7,67 @@ let offscreenCreating = null,
   reservationTail = Promise.resolve();
 let captureCount = 0;
 const captureWaiters = [];
+let diagnosticTail = Promise.resolve();
+function record(stage, message = "") {
+  diagnosticTail = diagnosticTail.then(async () => {
+    const stored = await chrome.storage.local.get("diagnostics");
+    const events = Array.isArray(stored.diagnostics) ? stored.diagnostics : [];
+    events.push(STFDiagnostics.event(stage, message));
+    await chrome.storage.local.set({ diagnostics: events.slice(-30) });
+  }).catch(() => {});
+  return diagnosticTail;
+}
+async function diagnostics() {
+  let status = null, helperError = "";
+  try { status = await native.call("status", {}, 10000); }
+  catch (e) { helperError = STFDiagnostics.clean(e.message); await record("helper.error", e.message); }
+  await diagnosticTail;
+  let events = [];
+  try { events = (await chrome.storage.local.get("diagnostics")).diagnostics || []; } catch {}
+  return { helper: STFDiagnostics.summary(status), helperError, events };
+}
+async function feedback(tab, message, kind = "waiting") {
+  if (!tab?.id) return;
+  const data = { type: "capture-feedback", message, kind };
+  try { await pageMessage(tab.id, 0, data); }
+  catch {
+    try { await injectTop(tab.id); await pageMessage(tab.id, 0, data); } catch {}
+  }
+}
+const deliveryWatchers = new Map();
+let deliveryPolling = null;
+function settleDeliveries(status) {
+  const jobs = new Map((status.jobs || []).map(j => [j.id, j]));
+  for (const [id, watcher] of deliveryWatchers) {
+    const job = jobs.get(id);
+    if (job?.status === "done") {
+      record("delivery.done");
+      feedback(watcher.tab, "Добавлено в Figma · №" + job.sequence, "done");
+      deliveryWatchers.delete(id);
+    } else if (["failed", "cancelled"].includes(job?.status)) {
+      record("delivery." + job.status, job.error);
+      feedback(watcher.tab, job.status === "cancelled" ? "Отправка отменена" : "Не удалось вставить: " + job.error, job.status === "failed" ? "error" : "waiting");
+      deliveryWatchers.delete(id);
+    } else if (Date.now() >= watcher.deadline) deliveryWatchers.delete(id);
+  }
+}
+function observeDelivery(id, tab, status) {
+  if (status.paused || !status.receivers?.some(r => r.targetId === status.targetId)) return;
+  deliveryWatchers.set(id, {tab, deadline:Date.now()+8000});
+  settleDeliveries(status);
+  if (!deliveryWatchers.size || deliveryPolling) return;
+  // One shared bounded observer for a burst of captures; never poll once per image.
+  deliveryPolling = (async () => {
+    while (deliveryWatchers.size) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        const current = await native.call("status", {}, 10000);
+        settleDeliveries(current);
+        await badge(current);
+      } catch { deliveryWatchers.clear(); }
+    }
+  })().catch(() => deliveryWatchers.clear()).finally(() => { deliveryPolling = null; });
+}
 function captureLane() {
   return new Promise((resolve) => {
     const enter = () => {
@@ -35,10 +96,12 @@ async function notify(title, message) {
 }
 async function badge(status) {
   try {
+    const waiting = status.pending && !status.receivers?.some(r => r.targetId === status.targetId);
     await chrome.action.setBadgeText({
-      text: status.pending ? String(Math.min(status.pending, 99)) : "",
+      text: status.failed ? "!" : status.pending ? String(Math.min(status.pending, 99)) : "",
     });
-    await chrome.action.setBadgeBackgroundColor({ color: "#202023" });
+    await chrome.action.setBadgeBackgroundColor({ color: status.failed ? "#b83b36" : waiting ? "#986b24" : "#202023" });
+    await chrome.action.setTitle?.({ title: status.failed ? "Send to Figma · есть ошибки, откройте очередь" : waiting ? "Send to Figma · изображения ждут приёмник" : "Send to Figma" });
   } catch {}
 }
 async function ensureOffscreen() {
@@ -164,6 +227,9 @@ async function uploadReliable(id, normalized) {
 async function sendImage(info, tab, explicitArea = false) {
   const id = crypto.randomUUID();
   let reserved = false;
+  let deliveryStatus = null;
+  record("capture.request");
+  feedback(tab, "Готовим изображение для Figma…");
   try {
     const preparation = reservationTail.then(async () => {
       if (!tab?.id) throw Error("Не удалось определить вкладку");
@@ -210,6 +276,7 @@ async function sendImage(info, tab, explicitArea = false) {
     reservationTail = preparation.catch(() => {});
     const { target, reservation } = await preparation;
     reserved = true;
+    record("capture.reserved");
     const releaseCapture = await captureLane();
     try {
       await native.call("begin_capture", { id });
@@ -218,7 +285,8 @@ async function sendImage(info, tab, explicitArea = false) {
         let input;
         try {
           input = await fetchBytes(target.source);
-        } catch {
+        } catch (e) {
+          record("capture.source-fallback", e.message);
           try {
             const r = await pageMessage(tab.id, info.frameId || 0, {
               type: "page-fetch",
@@ -240,13 +308,18 @@ async function sendImage(info, tab, explicitArea = false) {
             ? "Выделите нужную область на странице."
             : "Исходник недоступен. Выделите область изображения; отправится снимок экрана.",
         );
+        await feedback(tab, "");
         const area = await selectArea(tab);
         if (!area?.ok) throw Error(area?.error || "Выделение отменено");
         normalized = await cropScreen(tab, area);
       }
       await uploadReliable(id, normalized);
       const status = await native.call("status", {}, 10000);
+      deliveryStatus = status;
+      record("capture.saved");
       await badge(status);
+      const connected = status.receivers?.some(r => r.targetId === reservation.targetId);
+      await feedback(tab, status.paused ? "Сохранено · очередь на паузе" : connected ? "Отправляем в Figma · №" + reservation.sequence : "Сохранено в очереди · откройте приёмник в Figma");
       const details =
         normalized.captureMode === "screen"
           ? " · снимок экрана"
@@ -260,7 +333,11 @@ async function sendImage(info, tab, explicitArea = false) {
     } finally {
       releaseCapture();
     }
+    if (deliveryStatus) observeDelivery(id, tab, deliveryStatus);
   } catch (e) {
+    record("capture.failed", e.message);
+    await feedback(tab, "Не удалось отправить: " + e.message, "error");
+    try { await chrome.action.setBadgeText({ text: "!" }); await chrome.action.setBadgeBackgroundColor({ color: "#b83b36" }); } catch {}
     if (reserved)
       try {
         await native.call("fail", { id, error: e.message }, 10000);
@@ -326,6 +403,10 @@ chrome.runtime.onMessage.addListener((m, sender, reply) => {
     sender.url === chrome.runtime.getURL("popup.html") ||
     sender.url === chrome.runtime.getURL("setup.html");
   if (!trusted) return;
+  if (m.type === "diagnostics") {
+    diagnostics().then(data => reply({ ok: true, data }), e => reply({ ok: false, error: STFDiagnostics.clean(e.message) }));
+    return true;
+  }
   if (
     m.type === "rpc" &&
     [

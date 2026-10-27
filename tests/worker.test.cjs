@@ -8,7 +8,8 @@ function worker() {
   const requests = [],
     notifications = [],
     listeners = {},
-    jobs = new Map();
+    jobs = new Map(),
+    local = {};
   let seq = 0,
     gets = 0;
   const listener = (key) => ({ addListener: (f) => (listeners[key] = f) });
@@ -72,6 +73,7 @@ function worker() {
     },
     alarms: { create() {}, onAlarm: listener("alarm") },
     storage: {
+      local: {get:async key=>({[key]:local[key]}),set:async values=>Object.assign(local,values)},
       session: {
         get: async () => {
           const i = gets++;
@@ -124,7 +126,7 @@ function worker() {
   context.importScripts = (...names) =>
     names.forEach((n) =>
       vm.runInContext(
-        fs.readFileSync(path.join(__dirname, "../extension", n), "utf8"),
+        fs.readFileSync(path.join(__dirname, n === "diagnostics.js" ? "../shared" : "../extension", n), "utf8"),
         context,
       ),
     );
@@ -132,7 +134,7 @@ function worker() {
     fs.readFileSync(path.join(__dirname, "../extension/background.js"), "utf8"),
     context,
   );
-  return { context, requests, notifications, listeners, jobs };
+  return { context, requests, notifications, listeners, jobs, local };
 }
 test("slow target lookup must not let the next browser click reserve first", async () => {
   const w = worker(),
@@ -217,4 +219,25 @@ test("rapid clicks reserve in order while at most two capture pipelines fetch at
     Array.from({ length: 8 }, (_, i) => "https://example.com/" + i + ".png"),
   );
   assert.equal(w.requests.filter((r) => r.type === "begin_capture").length, 8);
+});
+
+test("one-click diagnostics are bounded, redacted, durable and unavailable to website senders",async()=>{
+ const w=worker();
+ await vm.runInContext('Promise.all(Array.from({length:35},()=>record("capture.failed","https://private.example/?token="+"a".repeat(64))))',w.context);
+ let report;
+ assert.equal(w.listeners.message({type:"diagnostics"},{id:"test-extension",url:"https://example.com/"},()=>{throw Error("Website accessed report")}),undefined);
+ assert.equal(w.listeners.message({type:"diagnostics"},{id:"test-extension",url:"chrome-extension://test-extension/popup.html"},r=>report=r),true);
+ while(!report)await new Promise(r=>setImmediate(r));
+ assert.equal(report.ok,true);assert.equal(report.data.events.length,30);
+ const text=JSON.stringify(report);assert.ok(!text.includes("private.example"));assert.ok(!text.includes("a".repeat(64)));
+ assert.equal(w.local.diagnostics.length,30);
+});
+
+test("a burst shares one delivery status poll instead of one poll per image",async()=>{
+ const w=worker();
+ for(let i=0;i<8;i++)w.jobs.set("request-watch-"+i,{id:"request-watch-"+i,sequence:i+1,status:"done"});
+ vm.runInContext('for(let i=0;i<8;i++)observeDelivery("request-watch-"+i,{id:1},{targetId:"collection-watch",receivers:[{targetId:"collection-watch"}],jobs:[]})',w.context);
+ await vm.runInContext('deliveryPolling',w.context);
+ assert.equal(w.requests.filter(r=>r.type==="status").length,1);
+ assert.equal(vm.runInContext('deliveryWatchers.size',w.context),0);
 });

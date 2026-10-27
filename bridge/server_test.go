@@ -200,3 +200,38 @@ func TestDuplicateCollectionCannotTakeOverActiveReceiver(t *testing.T) {
 	}
 	readMessage(t, first, "status")
 }
+
+func TestFirstReceiverAutomaticallyClaimsUnassignedCaptures(t *testing.T) {
+	s, h := testServer(t)
+	reserve(t, s.store, "request-unassigned")
+	upload(t, s.store, "request-unassigned")
+	c := connectReceiver(t, h, strings.Repeat("b", 64), "collection-first")
+	defer c.Close()
+	readMessage(t, c, "connected")
+	m := readMessage(t, c, "image")
+	if m["job"].(map[string]any)["id"] != "request-unassigned" {
+		t.Fatal("First-use capture not delivered")
+	}
+}
+func TestOfflineDefaultMovesOnlyFutureCapturesAndActiveDefaultIsPreserved(t *testing.T) {
+	s, h := testServer(t)
+	s.store.Destination("collection-offline", "Offline")
+	reserve(t, s.store, "request-frozen")
+	upload(t, s.store, "request-frozen")
+	c := connectReceiver(t, h, strings.Repeat("b", 64), "collection-current")
+	defer c.Close()
+	readMessage(t, c, "connected")
+	if got := s.store.Snapshot(); got.TargetID != "collection-current" || got.Jobs[0].TargetID != "collection-offline" {
+		t.Fatal("Offline default or frozen destination mishandled")
+	}
+	next, e := s.store.Reserve(ReserveInput{ID: "request-next"})
+	if e != nil || next.TargetID != "collection-current" {
+		t.Fatal("Future capture missed current receiver")
+	}
+	second := connectReceiver(t, h, strings.Repeat("b", 64), "collection-second")
+	defer second.Close()
+	readMessage(t, second, "connected")
+	if s.store.Summary().TargetID != "collection-current" {
+		t.Fatal("Second receiver stole an active destination")
+	}
+}

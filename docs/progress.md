@@ -1,3 +1,15 @@
+# 1.3 connection repair
+
+Goal: fix inert receiver, provision local pairing during Setup, auto-start on plugin launch, one-click redacted diagnostics in Figma/popup/setup. Preserve explicit collection ownership, frozen queued destinations, authentication and local-only transport. Do not add an unauthenticated pairing endpoint.
+
+The screenshot is consistent with host replies being rejected by the UI source-window equality check; Figma's documented pluginMessage contract does not require that equality. Replace the assumption with a per-launch channel injected into UI HTML and checked in both directions. Add source=null relay tests and a combined emitted UI/main/native delivery test; fixtures must no longer assume host source equals parent.
+
+Setup injects only the pairing token into the installed code after checking the shared payload hashes. Shared release retains its placeholder. Existing config/queue remain intact, corrupt config fails safely. Reopening the plugin restores/creates its managed collection and starts automatically. Manual code stays as a fallback. Never auto-claim jobs frozen to other targets.
+
+Local build, 55 JavaScript tests (zero skipped), 26 bridge and 7 installer Go tests, vet and resource/hash checks passed. The combined emitted UI/main/native test drains a first-use image and restores the same collection on reopening through a null-source host relay. Diagnostics redact credentials/URLs and remain copyable without clipboard permission. Windows installer provisioning and Chromium checks must be read from the release commit’s CI. Actual Figma Desktop still needs a target-machine check.
+
+---
+
 # 1.2.2 manifest import repair
 
 User screenshot reproduced Figma rejecting the allowedDomains IP literal. Changed manifest and receiver URL together to localhost, without broadening network scope or changing helper/data identity. Added a built-output regression guard and changed real native/WebSocket integration tests to resolve localhost. Local build, 45 JavaScript tests (zero skipped), bridge/installer Go tests and vet, packaged resources/hashes passed. Real native tests now connect through localhost. CI and the resulting release must be verified before delivery. Figma Desktop import remains a target-host check.

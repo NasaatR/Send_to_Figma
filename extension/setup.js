@@ -123,31 +123,20 @@
     }
   };
   $("copy-report").onclick = async () => {
-    const report = JSON.stringify(
-      {
-        product: "Send to Figma",
-        extension: chrome.runtime.getManifest().version,
-        helper: current?.version || "unavailable",
-        browser: navigator.userAgent,
-        receiverConnected: !!current?.receivers.some(
-          (r) => r.targetId === current.targetId,
-        ),
-        pending: current?.pending ?? null,
-        failed: current?.failed ?? null,
-        testState: testId
-          ? current?.jobs.find((j) => j.id === testId)?.status || "unknown"
-          : "not-run",
-      },
-      null,
-      2,
-    );
+    let diagnostic = { helper: STFDiagnostics.summary(current), events: [] };
     try {
-      await copy(report, "Отчёт скопирован");
-    } catch {
-      $("report-fallback").hidden = false;
-      $("report-fallback").value = report;
-      $("report-fallback").select();
-    }
+      const r = await chrome.runtime.sendMessage({type:"diagnostics"});
+      if (r?.ok) diagnostic = r.data;
+    } catch (e) { diagnostic.helperError = STFDiagnostics.clean(e.message); }
+    const report = STFDiagnostics.report("browser-setup", chrome.runtime.getManifest().version, {
+      browser: navigator.userAgent, helper: diagnostic.helper,
+      helperError: diagnostic.helperError || "",
+      receiverConnected: !!current?.receivers.some(r => r.targetId === current.targetId),
+      pending: current?.pending ?? null, failed: current?.failed ?? null,
+      testState: testId ? current?.jobs.find(j => j.id === testId)?.status || "unknown" : "not-run",
+    }, diagnostic.events);
+    const ok = await STFDiagnostics.copy(report, $("report-fallback"));
+    toast(ok ? "Диагностика скопирована" : "Нажмите Ctrl+C, чтобы скопировать диагностику");
   };
   chrome.storage.local
     .get("appearance")

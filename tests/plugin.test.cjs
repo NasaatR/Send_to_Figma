@@ -5,121 +5,13 @@ const path = require("node:path");
 const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 
-function pluginSource() {
-  const built = path.join(
-    root,
-    "release",
-    "Send-to-Figma-" + require("../package.json").version,
-    "figma-plugin/code.js",
-  );
-  return fs.existsSync(built)
-    ? fs.readFileSync(built, "utf8")
-    : fs.readFileSync(path.join(root, "plugin/core.js"), "utf8") +
-        "\n" +
-        fs.readFileSync(path.join(root, "plugin/main.js"), "utf8");
-}
+const {fixture,pluginSource}=require("./figma-fixture.cjs");
 
-function fixture() {
-  let next = 0;
-  const nodes = new Map(),
-    messages = [],
-    storage = new Map();
-  function node(type) {
-    const n = {
-      id: `1:${++next}`,
-      type,
-      name: type,
-      x: 0,
-      y: 0,
-      width: 100,
-      height: 100,
-      children: [],
-      parent: null,
-      removed: false,
-      layoutMode: "NONE",
-      fills: [],
-      locked: false,
-      metadata: {},
-      resize(w, h) {
-        this.width = w;
-        this.height = h;
-      },
-      appendChild(child) {
-        if (child.parent)
-          child.parent.children = child.parent.children.filter(
-            (x) => x !== child,
-          );
-        this.children.push(child);
-        child.parent = this;
-      },
-      remove() {
-        this.removed = true;
-        if (this.parent)
-          this.parent.children = this.parent.children.filter((x) => x !== this);
-        nodes.delete(this.id);
-      },
-      getPluginData(k) {
-        return this.metadata[k] || "";
-      },
-      setPluginData(k, v) {
-        this.metadata[k] = v;
-      },
-      setRelaunchData() {},
-    };
-    nodes.set(n.id, n);
-    return n;
-  }
-  const document = node("DOCUMENT");
-  document.name = "Test file";
-  const page = node("PAGE");
-  page.name = "Page 1";
-  page.selection = [];
-  document.appendChild(page);
-  const figma = {
-    root: document,
-    currentPage: page,
-    ui: { postMessage: (m) => messages.push(m) },
-    clientStorage: {
-      getAsync: async (k) => storage.get(k),
-      setAsync: async (k, v) => storage.set(k, v),
-    },
-    showUI() {},
-    on() {},
-    notify() {},
-    commitUndo() {},
-    viewport: { center: { x: 0, y: 0 }, scrollAndZoomIntoView() {} },
-    getNodeByIdAsync: async (id) => nodes.get(id) || null,
-    loadFontAsync: async () => {},
-    createImage(bytes) {
-      assert.ok(bytes.length > 0);
-      return {
-        hash: "image-hash",
-        getSizeAsync: async () => ({ width: 400, height: 200 }),
-      };
-    },
-    createFrame() {
-      const n = node("FRAME");
-      page.appendChild(n);
-      return n;
-    },
-    createRectangle() {
-      const n = node("RECTANGLE");
-      page.appendChild(n);
-      return n;
-    },
-    createText() {
-      const n = node("TEXT");
-      page.appendChild(n);
-      return n;
-    },
-  };
-  return { figma, messages, nodes, storage, node, page };
-}
 async function setup() {
   const f = fixture();
   const ctx = {
     figma: f.figma,
-    __html__: "",
+    __html__: "__STF_CHANNEL__",
     Uint8Array,
     console,
     Math,
@@ -143,7 +35,7 @@ async function send(f, m) {
           .targetId,
       },
     };
-  await f.figma.ui.onmessage(m);
+  await f.figma.ui.onmessage({ ...m, channel: f.figma.shownHTML });
   await turn();
   return f.messages.at(-1);
 }
@@ -306,7 +198,7 @@ test("starting while settings load waits for persisted configuration", async () 
   f.figma.clientStorage.getAsync = () => new Promise((r) => (finish = r));
   const context = {
     figma: f.figma,
-    __html__: "",
+    __html__: "__STF_CHANNEL__",
     Uint8Array,
     console,
     Math,
@@ -316,7 +208,7 @@ test("starting while settings load waits for persisted configuration", async () 
   };
   vm.createContext(context);
   vm.runInContext(pluginSource(), context);
-  const start = f.figma.ui.onmessage({ type: "start", mode: "new" });
+  const start = f.figma.ui.onmessage({ type: "start", mode: "new", channel: f.figma.shownHTML });
   await turn();
   assert.equal(
     [...f.nodes.values()].filter((n) => n.type === "FRAME").length,
@@ -429,4 +321,22 @@ test("failed settings or pairing persistence leaves the last confirmed settings 
     [...f.nodes.values()].find((n) => n.type === "FRAME").width,
     368,
   );
+});
+
+test("host ignores a command from another plugin launch channel",async()=>{
+ const f=await setup();
+ await f.figma.ui.onmessage({type:"start",mode:"new",channel:"foreign"});await turn();
+ assert.equal([...f.nodes.values()].filter(n=>n.type==="FRAME").length,0);
+ await send(f,{type:"start",mode:"new"});
+ assert.equal([...f.nodes.values()].filter(n=>n.getPluginData("stf-collection")).length,1);
+});
+
+test("installed pairing remains available when Figma client storage cannot be read",async()=>{
+ const f=fixture(),token="b".repeat(64);
+ f.figma.clientStorage.getAsync=async()=>{throw Error("Storage unavailable")};
+ const context=vm.createContext({figma:f.figma,__html__:"__STF_CHANNEL__",Uint8Array,console,Math,Date,JSON,Promise});
+ vm.runInContext(pluginSource().replace("__STF_INSTALL_TOKEN__",token),context);await turn();
+ assert.equal(f.messages.findLast(m=>m.type==="init").settings.pairingToken,token);
+ await send(f,{type:"start",mode:"restore"});
+ assert.ok(f.messages.some(m=>m.type==="target"));
 });

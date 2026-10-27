@@ -285,9 +285,9 @@ const server = http.createServer((req, res) => {
             () =>
               dispatchEvent(
                 new MessageEvent("message", {
-                  source: window,
+                  source: null,
                   data: {
-                    pluginMessage: { type: "init", settings, target: null },
+                    pluginMessage: { type: "init", channel: message.pluginMessage.channel, settings, target: null },
                   },
                 }),
               ),
@@ -296,6 +296,8 @@ const server = http.createServer((req, res) => {
       };
     }, settings);
     await receiver.goto(url + "/receiver.html");
+    await receiver.waitForFunction(() => document.getElementById("connection-text").textContent === "Готово к подключению");
+    await receiver.screenshot({animations:"disabled",path:path.join(output,"receiver-start.png")});
     await receiver.locator("#layout-tab").click();
     await receiver.locator("#layout-preset").selectOption("compact");
     assert.equal(await receiver.locator("#columns").inputValue(), "6");

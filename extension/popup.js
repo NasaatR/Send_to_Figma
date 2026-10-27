@@ -399,6 +399,18 @@
     $("connect-action").onclick =
     $("settings-setup").onclick =
       openSetup;
+  $("copy-report").onclick = async () => {
+    let diagnostic = { helper: STFDiagnostics.summary(lastStatus), events: [] };
+    try {
+      const r = await chrome.runtime.sendMessage({type:"diagnostics"});
+      if (r?.ok) diagnostic = r.data;
+    } catch (e) { diagnostic.helperError = STFDiagnostics.clean(e.message); }
+    const report = STFDiagnostics.report("browser-popup", chrome.runtime.getManifest().version, {
+      browser: navigator.userAgent, helper: diagnostic.helper, helperError: diagnostic.helperError || "",
+    }, diagnostic.events);
+    const ok = await STFDiagnostics.copy(report, $("report-fallback"));
+    toast(ok ? "Диагностика скопирована" : "Нажмите Ctrl+C, чтобы скопировать диагностику");
+  };
   $("refresh").onclick = refresh;
   $("pause-queue").onclick = () =>
     action("pause", { paused: !lastStatus.paused });

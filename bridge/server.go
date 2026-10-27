@@ -333,11 +333,22 @@ func (s *Server) receive(w http.ResponseWriter, req *http.Request) {
 		}
 		s.mu.Unlock()
 	}()
-	if s.store.Summary().TargetID == "" {
-		if e = s.store.Destination(r.info.TargetID, r.info.Label); e != nil {
-			r.write(map[string]string{"type": "error", "error": e.Error()})
-			return
+	s.mu.Lock()
+	current := s.store.Summary()
+	activeDestination := s.receivers[current.TargetID] != nil
+	if current.TargetID == "" || !activeDestination {
+		// First-use captures have no destination yet. The first receiver owns
+		// them; already assigned jobs always keep their original destination.
+		if current.TargetID == "" {
+			e = s.store.Claim(r.info.TargetID, r.info.Label)
+		} else {
+			e = s.store.Destination(r.info.TargetID, r.info.Label)
 		}
+	}
+	s.mu.Unlock()
+	if e != nil {
+		r.write(map[string]string{"type": "error", "error": e.Error()})
+		return
 	}
 	c.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.SetPongHandler(func(string) error { return c.SetReadDeadline(time.Now().Add(60 * time.Second)) })

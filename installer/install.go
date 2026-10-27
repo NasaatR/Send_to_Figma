@@ -104,6 +104,21 @@ func installPackage(source, base, arch string, hooks Hooks) error {
 	if json.Unmarshal(b, &manifest) != nil || manifest.Version != version {
 		return errors.New("Версии установщика и расширения различаются")
 	}
+	codePath := filepath.Join(stage, "figma-plugin", "code.js")
+	code, err := os.ReadFile(codePath)
+	if err != nil {
+		return err
+	}
+	if strings.Count(string(code), installTokenMarker) != 1 {
+		return errors.New("В приёмнике отсутствует настройка автоматического подключения")
+	}
+	token, err := installationPairing(base)
+	if err != nil {
+		return err
+	}
+	if err = os.WriteFile(codePath, []byte(strings.Replace(string(code), installTokenMarker, token, 1)), 0600); err != nil {
+		return err
+	}
 	host := map[string]any{"name": "com.sendtofigma.bridge", "description": "Local image receiver for Figma", "path": filepath.Join(installed, "bin", "send-to-figma-bridge.exe"), "type": "stdio", "allowed_origins": []string{"chrome-extension://" + extensionID + "/"}}
 	b, _ = json.MarshalIndent(host, "", "  ")
 	if err = os.WriteFile(filepath.Join(stage, "native-host.json"), b, 0600); err != nil {

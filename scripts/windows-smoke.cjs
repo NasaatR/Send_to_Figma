@@ -36,6 +36,14 @@ const run = (args) => {
       "chrome-extension://bmkagaljfnifdpdchjkbgehfijgecmap/",
     );
     assert.ok(fs.existsSync(m.path));
+    const setupConfig=JSON.parse(fs.readFileSync(path.join(installed,"data","config.json"),"utf8")),
+      installedCode=fs.readFileSync(path.join(installed,"app","figma-plugin","code.js"),"utf8"),
+      sharedCode=fs.readFileSync(path.join(release,"figma-plugin","code.js"),"utf8");
+    assert.match(setupConfig.pairingToken,/^[a-f0-9]{64}$/);
+    assert.ok(installedCode.includes(setupConfig.pairingToken),"Setup did not provision the receiver");
+    assert.ok(!installedCode.includes("__STF_INSTALL_TOKEN__"));
+    assert.ok(sharedCode.includes("__STF_INSTALL_TOKEN__"),"Shared package contains credentials");
+    assert.ok(!sharedCode.includes(setupConfig.pairingToken));
     assert.ok(
       fs.existsSync(path.join(installed, "app", "extension", "setup.html")),
     );
@@ -96,6 +104,7 @@ const run = (args) => {
     assert.equal(reply.ok, true, reply.error);
     assert.equal(reply.data.version, version);
     assert.equal(reply.data.pending, 0);
+    assert.equal(reply.data.pairingToken, setupConfig.pairingToken);
     serverPID = Number(
       (await (await fetch("http://127.0.0.1:47821/health")).json()).pid,
     );

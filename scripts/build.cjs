@@ -34,6 +34,7 @@ const css = read("shared/ui.css"),
   core = read("plugin/core.js");
 copy("extension");
 copy("shared/icons.js", "extension/icons.js");
+copy("shared/diagnostics.js", "extension/diagnostics.js");
 fs.writeFileSync(path.join(out, "extension/ui.css"), css);
 for (const name of ["popup.html", "setup.html"]) {
   const p = path.join(out, "extension", name);
@@ -67,6 +68,7 @@ fs.writeFileSync(
   path.join(plugin, "ui.html"),
   read("plugin/ui.html")
     .replace("/*__SHARED_CSS__*/", css)
+    .replace("/*__DIAGNOSTICS_JS__*/", read("shared/diagnostics.js"))
     .replace("/*__CORE_JS__*/", core)
     .replace("/*__UI_JS__*/", read("plugin/ui.js"))
     .replaceAll("__VERSION__", version),

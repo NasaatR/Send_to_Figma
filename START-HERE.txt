@@ -1,13 +1,12 @@
-SEND TO FIGMA 1.2.2
+SEND TO FIGMA 1.3.0
 
-1. Extract the entire ZIP. Double-click Setup.exe.
-2. Follow the page that opens. It includes the exact folders to select.
-3. Send the test image and wait for Figma's insertion confirmation.
+Распакуй весь архив → Setup.exe → подключи расширение и импортируй
+%LOCALAPPDATA%\SendToFigma\app\figma-plugin\manifest.json в Figma Desktop.
+Запусти Send to Figma · Receiver — он подключится автоматически.
+Копировать код и нажимать «Начать приём» больше не нужно.
 
-Русская инструкция: README.ru.md
-
-Коротко: распакуй весь архив → Setup.exe → следуй открывшейся странице.
-Установка расширения и импорт приёмника Figma выполняются один раз.
-Для передачи другому человеку используй этот ZIP, а не установленную папку data.
+Обновление: закрой приёмник → Setup.exe → ↻ у расширения → открой приёмник.
+Диагностика: значок копирования в шапке расширения или кнопка внизу Figma.
+Для передачи используй этот исходный ZIP. Установленная папка содержит локальный ключ.
 
 Made by Nasaat

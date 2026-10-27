@@ -1,7 +1,9 @@
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id),
-    send = (m) => parent.postMessage({ pluginMessage: m }, "*");
+    D = STFDiagnostics,
+    channel = document.querySelector('meta[name="stf-channel"]').content,
+    send = (m) => { record("host.request." + m.type); parent.postMessage({ pluginMessage: { ...m, channel } }, "*"); };
   let settings = {
       version: 1,
       layout: STFCore.normalizeLayout({}),
@@ -14,7 +16,28 @@
     attempts = 0,
     retryTimer = null,
     toastTimer = null,
-    starting = false;
+    starting = false,
+    hostReady = false,
+    initialized = false,
+    phase = "initializing",
+    helperStatus = null,
+    commandTimer = null;
+  const events = [];
+  function record(stage, message = "") {
+    events.push(D.event(stage, message));
+    if (events.length > 30) events.shift();
+  }
+  function waiting(mode) {
+    starting = mode;
+    state("Готовим коллекцию…");
+    clearTimeout(commandTimer);
+    commandTimer = setTimeout(() => {
+      starting = false;
+      phase = "host-timeout";
+      state("Figma не ответила");
+      error("Нет ответа от Figma. Перезапустите приёмник. Если повторится — нажмите «Диагностика».");
+    }, 8000);
+  }
   const imports = new Map();
   const presets = {
     grid: { columns: 4, width: 320, gap: 24, padding: 24, maxHeight: 480 },
@@ -27,6 +50,7 @@
     "-" +
     Math.random().toString(36).slice(2);
   function error(message) {
+    if (message) record("error", message);
     $("notice").textContent = message;
     $("notice").hidden = !message;
   }
@@ -39,9 +63,10 @@
   function state(text, online = false) {
     $("connection-text").textContent = text;
     $("connection").classList.toggle("online", online);
-    $("start").textContent = enabled ? "Остановить приём" : "Начать приём";
-    $("new-collection").disabled = enabled || imports.size > 0;
-    $("selected-collection").disabled = enabled || imports.size > 0;
+    $("start").textContent = starting ? "Подключаем…" : enabled ? "Остановить приём" : "Начать приём";
+    $("start").disabled = !!starting || !hostReady;
+    $("new-collection").disabled = !!starting || !hostReady || imports.size > 0;
+    $("selected-collection").disabled = !!starting || !hostReady || imports.size > 0;
     $("reflow").disabled = imports.size > 0;
   }
   function applyAppearance(a) {
@@ -113,6 +138,7 @@
   }
   function status(s) {
     if (!s) return;
+    helperStatus = s;
     if (enabled && socket?.readyState === WebSocket.OPEN && imports.size === 0)
       state(s.paused ? "Очередь на паузе" : "Приёмник подключён", !s.paused);
     $("pending-count").textContent = "В очереди: " + s.pending;
@@ -125,6 +151,9 @@
   }
   function stop() {
     enabled = false;
+    starting = false;
+    clearTimeout(commandTimer);
+    phase = "stopped";
     clearTimeout(retryTimer);
     retryTimer = null;
     if (socket) {
@@ -133,6 +162,7 @@
       socket = null;
     }
     state("Приём остановлен");
+    $("connection-help").textContent = "Нажмите «Начать приём», чтобы продолжить.";
   }
   function connect() {
     if (!enabled || !target) return;
@@ -142,8 +172,19 @@
       socket.close();
       socket = null;
     }
-    state("Подключение…");
-    const ws = new WebSocket("ws://localhost:47821/receiver");
+    phase = "connecting";
+    state("Подключаем помощник…");
+    $("connection-help").textContent = "Ищем помощник на этом компьютере…";
+    record("socket.connect");
+    let ws;
+    try { ws = new WebSocket("ws://localhost:47821/receiver"); }
+    catch (e) {
+      phase = "socket-blocked";
+      error("Figma заблокировала подключение: " + e.message);
+      state("Подключение заблокировано");
+      $("connection-help").textContent = "Обновите через Setup.exe и перезапустите плагин. Диагностика доступна внизу.";
+      return;
+    }
     socket = ws;
     ws.onopen = () => {
       if (socket !== ws || !enabled) return;
@@ -168,6 +209,9 @@
         return;
       }
       if (m.type === "connected") {
+        phase = "connected";
+        record("socket.connected");
+        $("connection-help").textContent = "Готово: на сайте нажмите правой кнопкой по изображению → «Отправить в Figma».";
         attempts = 0;
         error("");
         state("Приёмник подключён", true);
@@ -180,6 +224,7 @@
         if (/код подключения/i.test(m.error || "")) {
           stop();
           $("pair-box").hidden = false;
+          $("manual-pair").open = true;
         }
       }
       if (m.type === "image") {
@@ -214,20 +259,24 @@
         }
       }
     };
-    ws.onerror = () =>
-      error(
-        "Помощник недоступен. Откройте расширение в браузере; если нужно — запустите Setup.exe.",
-      );
-    ws.onclose = () => {
+    ws.onerror = () => {
+      phase = "helper-unavailable";
+      record("socket.error");
+      error("Нет связи с помощником. Откройте меню расширения в браузере. Подключение повторится автоматически.");
+      $("connection-help").textContent = "Если Figma запросит доступ к локальной сети, разрешите его для приёмника.";
+    };
+    ws.onclose = (event) => {
+      record("socket.close", "code=" + (event?.code || 0));
       if (socket === ws) socket = null;
       if (!enabled) return;
       state("Связь прервалась");
       if (attempts >= 5) state("Ожидаем помощник — откройте расширение");
-      const delay = Math.min(30000, 1000 * 2 ** Math.min(attempts++, 5));
+      const delay = Math.min(8000, 1000 * 2 ** Math.min(attempts++, 3));
       retryTimer = setTimeout(connect, delay);
     };
   }
   function begin(mode) {
+    if (!hostReady) return;
     error("");
     const typed = $("pair-token").value.trim();
     if (typed && typed !== settings.pairingToken) {
@@ -235,16 +284,17 @@
         error("Вставьте полный код подключения из расширения");
         return;
       }
-      starting = mode;
+      waiting(mode);
       send({ type: "pair", token: typed });
       return;
     }
     if (!settings.pairingToken) {
-      error("Сначала вставьте код подключения из расширения");
+      $("manual-pair").open = true;
+      error("Запустите Setup.exe для автоматического подключения. Или вставьте код вручную ниже.");
       $("pair-token").focus();
       return;
     }
-    starting = false;
+    waiting(mode);
     send({ type: "start", mode });
   }
   function persist(layout, appearance) {
@@ -252,19 +302,33 @@
     send({ type: "settings", layout, appearance });
   }
   window.onmessage = (e) => {
-    if (e.source !== parent || !e.data || !e.data.pluginMessage) return;
-    const m = e.data.pluginMessage;
+    // Figma Desktop can relay host events without a browser parent source.
+    // Authenticate the per-launch channel injected by main instead.
+    const m = e.data?.pluginMessage;
+    if (!m || m.channel !== channel || typeof m.type !== "string") return;
+    record("host.reply." + m.type);
     if (m.type === "init") {
+      if (!m.settings || !m.settings.layout || !m.settings.appearance) return;
+      hostReady = true;
       settings = m.settings;
       target = m.target;
       loadForms();
       showTarget();
-      $("pair-box").hidden = !!settings.pairingToken;
+      $("pair-box").hidden = false;
+      state(enabled ? "Подключение…" : "Готово к подключению");
+      if (!initialized) {
+        initialized = true;
+        if (settings.pairingToken) begin("restore");
+        else {
+          phase = "setup-required";
+          $("connection-help").textContent = "Запустите Setup.exe из новой версии: он подключит приёмник автоматически. Ручной код — внизу.";
+        }
+      }
     }
     if (m.type === "paired") {
       settings = m.settings;
       $("pair-token").value = "";
-      $("pair-box").hidden = true;
+      $("manual-pair").open = false;
       if (starting) {
         const mode = starting;
         starting = false;
@@ -272,6 +336,8 @@
       }
     }
     if (m.type === "target") {
+      clearTimeout(commandTimer);
+      starting = false;
       target = m.target;
       showTarget();
       enabled = true;
@@ -316,7 +382,10 @@
     }
     if (m.type === "reflowed") toast("Перестроено карточек: " + m.count);
     if (m.type === "error") {
+      clearTimeout(commandTimer);
       starting = false;
+      phase = "host-error";
+      state(enabled ? "Приёмник подключён" : "Не удалось запустить приём");
       error(m.error);
     }
   };
@@ -343,14 +412,13 @@
       }
     };
   });
-  $("start").onclick = () => (enabled ? stop() : begin("restore"));
-  $("new-collection").onclick = () => begin("new");
-  $("selected-collection").onclick = () => begin("selected");
+  $("start").onclick = () => { if (!starting) enabled ? stop() : begin("restore"); };
+  $("new-collection").onclick = () => { stop(); begin("new"); };
+  $("selected-collection").onclick = () => { stop(); begin("selected"); };
   $("reveal").onclick = () => send({ type: "reveal" });
   $("change-pair").onclick = () => {
     stop();
-    $("pair-box").hidden = false;
-    $("pair-token").focus();
+    begin("restore");
   };
   $("claim").onclick = () => {
     if (socket?.readyState === WebSocket.OPEN)
@@ -459,6 +527,24 @@
       $("settings-file").value = "";
     }
   };
+  $("copy-report").onclick = async () => {
+    const report = D.report("figma-receiver", "__VERSION__", {
+      browser: navigator.userAgent, hostReady, phase, starting: !!starting, enabled,
+      pairingAvailable: !!settings.pairingToken, collectionSelected: !!target,
+      socketState: socket?.readyState ?? null, reconnectAttempts: attempts,
+      importing: imports.size, helper: D.summary(helperStatus),
+    }, events);
+    const ok = await D.copy(report, $("report-fallback"));
+    toast(ok ? "Диагностика скопирована" : "Нажмите Ctrl+C, чтобы скопировать диагностику");
+  };
+  window.addEventListener("error", e => error("Ошибка панели: " + D.clean(e.message)));
+  window.addEventListener("unhandledrejection", e => error("Ошибка действия: " + D.clean(e.reason?.message || e.reason)));
+  setTimeout(() => {
+    if (hostReady) return;
+    phase = "host-unavailable";
+    error("Панель не получила ответ Figma. Перезапустите плагин после обновления. Нажмите «Диагностика», если ошибка повторится.");
+    state("Нет ответа от Figma");
+  }, 6000);
   setInterval(() => {
     if (socket?.readyState === WebSocket.OPEN)
       socket.send(JSON.stringify({ type: "status" }));

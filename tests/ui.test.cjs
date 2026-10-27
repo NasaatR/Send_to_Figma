@@ -19,6 +19,7 @@ async function popup(status) {
   w.chrome = {
     runtime: {
       id: "test-id",
+      getManifest: () => ({version:"fixture"}),
       sendMessage: async (m) => {
         requests.push(m);
         return { ok: true, data: status };
@@ -33,6 +34,7 @@ async function popup(status) {
       },
     },
   };
+  w.eval(fs.readFileSync(path.join(root, "shared/diagnostics.js"), "utf8"));
   w.eval(fs.readFileSync(path.join(root, "shared/icons.js"), "utf8"));
   w.eval(fs.readFileSync(path.join(root, "extension/queue-core.js"), "utf8"));
   w.eval(fs.readFileSync(path.join(root, "extension/popup.js"), "utf8"));
@@ -116,6 +118,8 @@ test("popup retry button sends the displayed operation id and exposes errors", a
 function plugin() {
   let html = fs.readFileSync(path.join(root, "plugin/ui.html"), "utf8");
   html = html
+    .replace("__STF_CHANNEL__", "fixture-channel")
+    .replace("/*__DIAGNOSTICS_JS__*/", fs.readFileSync(path.join(root, "shared/diagnostics.js"), "utf8"))
     .replace(
       "/*__CORE_JS__*/",
       fs.readFileSync(path.join(root, "plugin/core.js"), "utf8"),
@@ -131,6 +135,10 @@ function plugin() {
     w = dom.window;
   const sends = [];
   w.postMessage = (m) => sends.push(m.pluginMessage);
+  w.dispatchEvent(new w.MessageEvent("message", { source: null, data: { pluginMessage: {
+    type:"init", channel:"fixture-channel", target:null,
+    settings:{version:1,layout:{columns:4,width:320,gap:24,padding:24,maxHeight:480,radius:8,captions:false},appearance:{theme:"light",density:"compact"},pairingToken:""}
+  } } }));
   return {
     dom,
     w,
@@ -138,8 +146,8 @@ function plugin() {
     deliver(m) {
       w.dispatchEvent(
         new w.MessageEvent("message", {
-          source: w,
-          data: { pluginMessage: m },
+          source: null,
+          data: { pluginMessage: { ...m, channel: "fixture-channel" } },
         }),
       );
     },
@@ -250,6 +258,7 @@ async function connectionPage() {
     },
     storage: { local: { get: async () => ({}) } },
   };
+  w.eval(fs.readFileSync(path.join(root, "shared/diagnostics.js"), "utf8"));
   w.eval(fs.readFileSync(path.join(root, "extension/setup.js"), "utf8"));
   await wait();
   return {
@@ -376,7 +385,7 @@ test("receiver keeps reconnecting after a long outage with a capped delay and re
     for (let i = 0; i < 8; i++) {
       sockets.at(-1).onclose();
       const timer = scheduled.at(-1);
-      assert.ok(timer.ms <= 30000);
+      assert.ok(timer.ms <= 8000);
       timer.fn();
     }
     assert.equal(sockets.length, 9);
@@ -590,4 +599,27 @@ test("layout presets modify only the draft until explicitly saved", () => {
   } finally {
     p.dom.window.close();
   }
+});
+
+test("receiver rejects a foreign channel and reports a synchronous WebSocket block", async () => {
+  const p=plugin();
+  try {
+    p.w.dispatchEvent(new p.w.MessageEvent("message",{source:null,data:{pluginMessage:{type:"target",channel:"foreign",target:{label:"Foreign",targetId:"foreign-target",count:0}}}}));
+    assert.notEqual(p.w.document.getElementById("target-name").textContent,"Foreign");
+    p.w.WebSocket=class { constructor(){throw Error("CSP blocked")}};
+    p.deliver({type:"target",target:{label:"Own",targetId:"own-target",count:0}});
+    assert.match(p.w.document.getElementById("notice").textContent,/CSP blocked/);
+    assert.match(p.w.document.getElementById("connection-text").textContent,/заблокировано/);
+    assert.equal(p.w.document.getElementById("start").disabled,false);
+  }finally{p.dom.window.close()}
+});
+test("receiver diagnostics can be copied without host replies or clipboard permission", async()=>{
+  const p=plugin();
+  try {
+    p.w.document.getElementById("copy-report").click();await wait();
+    const fallback=p.w.document.getElementById("report-fallback");
+    assert.equal(fallback.hidden,false);
+    assert.equal(JSON.parse(fallback.value).surface,"figma-receiver");
+    assert.ok(!fallback.value.includes("fixture-channel"));
+  }finally{p.dom.window.close()}
 });

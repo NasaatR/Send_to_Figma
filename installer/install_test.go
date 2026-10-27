@@ -15,7 +15,7 @@ func fixturePackage(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
-		"extension/manifest.json": `{"version":"development","key":"fixture"}`, "extension/background.js": "background", "extension/setup.html": "setup", "figma-plugin/manifest.json": "{}", "figma-plugin/code.js": "code", "figma-plugin/ui.html": "ui", "windows/amd64/send-to-figma-bridge.exe": "x64", "windows/arm64/send-to-figma-bridge.exe": "arm64",
+		"extension/manifest.json": `{"version":"development","key":"fixture"}`, "extension/background.js": "background", "extension/setup.html": "setup", "figma-plugin/manifest.json": "{}", "figma-plugin/code.js": `const token="__STF_INSTALL_TOKEN__";`, "figma-plugin/ui.html": "ui", "windows/amd64/send-to-figma-bridge.exe": "x64", "windows/arm64/send-to-figma-bridge.exe": "arm64",
 	}
 	hashes := map[string]string{}
 	for p, text := range files {
@@ -123,5 +123,53 @@ func TestARM64ChoosesNativeHelper(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(base, "app", "bin", "send-to-figma-bridge.exe"))
 	if string(b) != "arm64" {
 		t.Fatal("Wrong helper")
+	}
+}
+
+func TestPairingProvisionedOnlyInInstalledBundleAndPreserved(t *testing.T) {
+	source, base := fixturePackage(t), t.TempDir()
+	if e := installPackage(source, base, "amd64", Hooks{}); e != nil {
+		t.Fatal(e)
+	}
+	token, e := installationPairing(base)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !tokenPattern.MatchString(token) {
+		t.Fatal("Missing random pairing token")
+	}
+	original, _ := os.ReadFile(filepath.Join(source, "figma-plugin", "code.js"))
+	installed, _ := os.ReadFile(filepath.Join(base, "app", "figma-plugin", "code.js"))
+	if !strings.Contains(string(original), installTokenMarker) || strings.Contains(string(original), token) {
+		t.Fatal("Shared package contains machine credentials")
+	}
+	if !strings.Contains(string(installed), token) || strings.Contains(string(installed), installTokenMarker) {
+		t.Fatal("Installed receiver not provisioned")
+	}
+	before, _ := os.ReadFile(filepath.Join(base, "data", "config.json"))
+	if e = installPackage(source, base, "amd64", Hooks{}); e != nil {
+		t.Fatal(e)
+	}
+	after, _ := os.ReadFile(filepath.Join(base, "data", "config.json"))
+	if string(before) != string(after) {
+		t.Fatal("Update rotated existing credentials")
+	}
+	other, e := installationPairing(t.TempDir())
+	if e != nil || other == token {
+		t.Fatal("Machines share credentials")
+	}
+}
+func TestPairingRejectsCorruptConfigWithoutReplacingAppOrData(t *testing.T) {
+	source, base := fixturePackage(t), t.TempDir()
+	os.MkdirAll(filepath.Join(base, "data"), 0700)
+	os.WriteFile(filepath.Join(base, "data", "config.json"), []byte("damaged"), 0600)
+	stopped := false
+	e := installPackage(source, base, "amd64", Hooks{Stop: func() error { stopped = true; return nil }})
+	if e == nil || stopped {
+		t.Fatal("Corrupt credentials reached mutation phase")
+	}
+	b, _ := os.ReadFile(filepath.Join(base, "data", "config.json"))
+	if string(b) != "damaged" {
+		t.Fatal("Credentials overwritten")
 	}
 }
