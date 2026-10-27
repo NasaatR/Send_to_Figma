@@ -6,7 +6,7 @@ The screenshot is consistent with host replies being rejected by the UI source-w
 
 Setup injects only the pairing token into the installed code after checking the shared payload hashes. Shared release retains its placeholder. Existing config/queue remain intact, corrupt config fails safely. Reopening the plugin restores/creates its managed collection and starts automatically. Manual code stays as a fallback. Never auto-claim jobs frozen to other targets.
 
-Local build, 55 JavaScript tests (zero skipped), 26 bridge and 7 installer Go tests, vet and resource/hash checks passed. The combined emitted UI/main/native test drains a first-use image and restores the same collection on reopening through a null-source host relay. Diagnostics redact credentials/URLs and remain copyable without clipboard permission. Windows installer provisioning and Chromium checks must be read from the release commit’s CI. Actual Figma Desktop still needs a target-machine check.
+Local build, 55 JavaScript tests (zero skipped), 26 bridge and 7 installer Go tests, vet and resource/hash checks passed. The combined emitted UI/main/native test drains a first-use image and restores the same collection on reopening through a null-source host relay. Diagnostics redact credentials/URLs and remain copyable without clipboard permission. The first clean CI install caught an accidental dependency-version replacement in the lockfile; restored all dependency entries to the previously checked lock and used npm version for product metadata only. Windows installer provisioning and Chromium checks must be read from the release commit’s CI. Actual Figma Desktop still needs a target-machine check.
 
 ---
 
